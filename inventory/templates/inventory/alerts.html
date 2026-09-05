@@ -1,0 +1,173 @@
+{% extends 'inventory/base.html' %}
+
+{% block content %}
+{% if user.is_authenticated %}
+<div class="card">
+    <h3>🚨 Inventory Alerts</h3>
+    <p style="margin-bottom: 15px; color: #666;">Real-time alerts for items that need your attention.</p>
+
+    <div style="display: flex; gap: 10px; margin-bottom: 20px;">
+        <button class="btn" onclick="generateNewAlerts()">🔄 Generate New Alerts</button>
+        <button class="btn btn-success" onclick="window.location.href='/'">Back to Dashboard</button>
+    </div>
+
+    <div id="alertsContainer">
+        {% if alerts %}
+            <div style="margin-bottom: 15px;">
+                <strong>Showing {{ alerts|length }} active alerts</strong>
+            </div>
+            {% for alert in alerts %}
+            <div class="alert alert-{{ alert.severity }}">
+                <div style="display: flex; justify-content: space-between; align-items: start;">
+                    <div>
+                        <h4 style="margin-bottom: 8px;">
+                            <span class="badge badge-{{ alert.severity }}">{{ alert.get_alert_type_display }}</span>
+                            {{ alert.product.name }} at {{ alert.store.name }}
+                        </h4>
+                        <p style="margin-bottom: 8px;"><strong>Issue:</strong> {{ alert.message }}</p>
+                        <p style="margin-bottom: 8px;"><strong>Recommended Action:</strong> {{ alert.recommended_action }}</p>
+                        <small style="color: #666;">Created: {{ alert.created_at|date:"M d, Y H:i" }}</small>
+                    </div>
+                    <button class="btn btn-success" style="padding: 5px 10px; font-size: 0.9em;" onclick="resolveAlert({{ alert.id }})">✓ Resolve</button>
+                </div>
+            </div>
+            {% endfor %}
+        {% else %}
+            <div class="alert alert-low">
+                <h4>✅ No Active Alerts</h4>
+                <p>All systems are running smoothly. Click "Generate New Alerts" to analyze your current inventory status.</p>
+            </div>
+        {% endif %}
+    </div>
+</div>
+
+<div class="card">
+    <h3>📊 Alert Statistics</h3>
+    <div class="stats-grid" style="margin-top: 15px;">
+        <div class="stat-card" style="background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);">
+            <h3 id="criticalCount">{{ critical_count }}</h3>
+            <p>Critical</p>
+        </div>
+        <div class="stat-card" style="background: linear-gradient(135deg, #ffc107 0%, #e0a800 100%);">
+            <h3 id="highCount">{{ high_count }}</h3>
+            <p>High Priority</p>
+        </div>
+        <div class="stat-card" style="background: linear-gradient(135deg, #17a2b8 0%, #138496 100%);">
+            <h3 id="mediumCount">{{ medium_count }}</h3>
+            <p>Medium Priority</p>
+        </div>
+        <div class="stat-card" style="background: linear-gradient(135deg, #28a745 0%, #218838 100%);">
+            <h3 id="lowCount">{{ low_count }}</h3>
+            <p>Low Priority</p>
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <h3>📋 Alert Types Explained</h3>
+    <table>
+        <thead>
+            <tr>
+                <th>Alert Type</th>
+                <th>Description</th>
+                <th>Typical Action</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td><span class="badge badge-critical">Stock Out</span></td>
+                <td>Product has zero inventory</td>
+                <td>Immediate restock required</td>
+            </tr>
+            <tr>
+                <td><span class="badge badge-high">Low Stock</span></td>
+                <td>Product below reorder level</td>
+                <td>Place reorder soon</td>
+            </tr>
+            <tr>
+                <td><span class="badge badge-medium">Overstock</span></td>
+                <td>Product above maximum stock level</td>
+                <td>Reduce orders or run promotions</td>
+            </tr>
+            <tr>
+                <td><span class="badge badge-medium">Slow Moving</span></td>
+                <td>Low sales velocity relative to stock</td>
+                <td>Review assortment or pricing</td>
+            </tr>
+            <tr>
+                <td><span class="badge badge-medium">Sales Spike</span></td>
+                <td>Unusual increase in sales</td>
+                <td>Ensure stock availability</td>
+            </tr>
+            <tr>
+                <td><span class="badge badge-high">Sales Drop</span></td>
+                <td>Unusual decrease in sales</td>
+                <td>Investigate cause and revive sales</td>
+            </tr>
+        </tbody>
+    </table>
+</div>
+{% else %}
+<div class="card">
+    <h3>Please Login</h3>
+    <p>You need to be logged in to access alerts.</p>
+    <a href="/login/" class="btn">Login</a>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+function generateNewAlerts() {
+    const container = document.getElementById('alertsContainer');
+    container.innerHTML = '<div class="loading">🔄 Analyzing inventory data and generating alerts...</div>';
+
+    fetch('/api/generate-alerts/', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': getCookie('csrftoken')
+        },
+        credentials: 'same-origin'
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Show success message then reload
+            container.innerHTML = `<div class="alert alert-low">✅ ${data.message}. Reloading page...</div>`;
+            setTimeout(() => {
+                window.location.reload();
+            }, 1500);
+        } else {
+            container.innerHTML = `<div class="alert alert-critical">Error generating alerts: ${data.error}</div>`;
+        }
+    })
+    .catch(error => {
+        container.innerHTML = `<div class="alert alert-critical">Error: ${error.message}</div>`;
+    });
+}
+
+function resolveAlert(alertId) {
+    if (!confirm('Mark this alert as resolved?')) return;
+
+    // In a real application, this would make an API call to resolve the alert
+    // For now, we'll just reload the page
+    window.location.reload();
+}
+
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+</script>
+{% endblock %}

@@ -1,0 +1,82 @@
+{% extends 'inventory/base.html' %}
+
+{% block content %}
+<div class="card">
+    <h3>📊 Product Analysis: {{ product.name }}</h3>
+    <p style="margin-bottom: 15px; color: #666;">Detailed performance analysis and AI-powered insights.</p>
+
+    <div style="display: flex; gap: 10px; margin-bottom: 20px;">
+        <button class="btn" onclick="window.location.href='/'">Back to Dashboard</button>
+    </div>
+
+    <div class="card" style="background: white; border-left: 4px solid #28a745;">
+        <h4>📈 AI Analysis</h4>
+        <div style="white-space: pre-wrap; margin-top: 10px;">{{ analysis }}</div>
+    </div>
+
+    <div class="stats-grid" style="margin-top: 20px;">
+        <div class="stat-card">
+            <h3>{{ metrics.total_quantity }}</h3>
+            <p>Total Units Sold (30 days)</p>
+        </div>
+        <div class="stat-card">
+            <h3>${{ metrics.total_revenue|floatformat:2 }}</h3>
+            <p>Total Revenue (30 days)</p>
+        </div>
+        <div class="stat-card">
+            <h3>{{ metrics.avg_daily_sales|floatformat:2 }}</h3>
+            <p>Average Daily Sales</p>
+        </div>
+    </div>
+
+    <div class="card" style="margin-top: 20px;">
+        <h4>🏪 Sales by Store</h4>
+        <table>
+            <thead>
+                <tr>
+                    <th>Store</th>
+                    <th>Units Sold</th>
+                    <th>Revenue</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for store_name, data in metrics.sales_by_store.items %}
+                <tr>
+                    <td><strong>{{ store_name }}</strong></td>
+                    <td>{{ data.quantity }}</td>
+                    <td>${{ data.revenue|floatformat:2 }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <div class="card" style="margin-top: 20px;">
+        <h4>📦 Current Stock Levels</h4>
+        <table>
+            <thead>
+                <tr>
+                    <th>Store</th>
+                    <th>Quantity</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for stock in metrics.stock_levels %}
+                <tr>
+                    <td><strong>{{ stock.store }}</strong></td>
+                    <td>{{ stock.quantity }}</td>
+                    <td>
+                        {% if stock.status == 'low' %}
+                            <span class="badge badge-high">Low Stock</span>
+                        {% else %}
+                            <span class="badge badge-low">Normal</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

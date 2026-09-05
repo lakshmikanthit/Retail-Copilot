@@ -1,0 +1,362 @@
+{% extends 'inventory/base.html' %}
+{% load static %}
+
+{% block content %}
+{% if user.is_authenticated %}
+<div class="stats-grid">
+    <div class="stat-card">
+        <h3>{{ stores.count }}</h3>
+        <p>Stores</p>
+    </div>
+    <div class="stat-card">
+        <h3>{{ products.count }}</h3>
+        <p>Products</p>
+    </div>
+    <div class="stat-card">
+        <h3>{{ total_stocks }}</h3>
+        <p>Stock Entries</p>
+    </div>
+    <div class="stat-card">
+        <h3>{{ recent_sales }}</h3>
+        <p>Recent Sales (7 days)</p>
+    </div>
+    <div class="stat-card" style="background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);">
+        <h3>{{ stock_out_count }}</h3>
+        <p>Stock Outs</p>
+    </div>
+    <div class="stat-card" style="background: linear-gradient(135deg, #ffc107 0%, #e0a800 100%);">
+        <h3>{{ low_stock_count }}</h3>
+        <p>Low Stock Items</p>
+    </div>
+</div>
+
+<div class="card">
+    <h3>🤖 AI Copilot Assistant</h3>
+    <p style="margin-bottom: 15px; color: #666;">Ask questions about your inventory, sales, and get data-driven recommendations.</p>
+
+    <div class="chat-container" id="chatContainer">
+        <div class="chat-message ai">
+            <strong>AI Copilot:</strong> Hello! I'm your retail inventory copilot. You can ask me questions like:
+            <ul style="margin-top: 10px; margin-left: 20px;">
+                <li>"What products are running out of stock?"</li>
+                <li>"Which products are overstocked?"</li>
+                <li>"How did Wireless Headphones perform this month?"</li>
+                <li>"What are my slow-moving items?"</li>
+                <li>"Show me sales trends for Electronics category"</li>
+            </ul>
+        </div>
+    </div>
+
+    <div class="chat-input-container">
+        <select id="storeSelect" class="chat-input" style="flex: 0 0 200px;">
+            <option value="">All Stores</option>
+            {% for store in stores %}
+            <option value="{{ store.id }}">{{ store.name }}</option>
+            {% endfor %}
+        </select>
+        <input type="text" id="chatInput" class="chat-input" placeholder="Ask a question about your inventory..." onkeypress="if(event.key === 'Enter') sendMessage()">
+        <button class="btn" onclick="sendMessage()">Send</button>
+    </div>
+</div>
+
+<div class="card">
+    <h3>📊 Quick Actions</h3>
+    <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+        <button class="btn" onclick="askQuestion('What products are running out of stock?')">Check Stock Outs</button>
+        <button class="btn" onclick="askQuestion('Which products are overstocked?')">Check Overstock</button>
+        <button class="btn" onclick="askQuestion('What are my slow-moving items?')">Slow Moving Items</button>
+        <button class="btn" onclick="askQuestion('What needs attention today?')">What Needs Attention</button>
+        <button class="btn btn-success" onclick="window.location.href='/alerts/'">View All Alerts</button>
+    </div>
+</div>
+
+<div class="card">
+    <h3>📊 Inventory Distribution by Category</h3>
+    <div style="display: flex; justify-content: center; margin-top: 20px;">
+        <canvas id="categoryChart" style="max-width: 400px; max-height: 400px;"></canvas>
+    </div>
+</div>
+
+<div class="card">
+    <h3>📈 Sales Performance by Store (Last 7 Days)</h3>
+    <div style="margin-top: 20px;">
+        <canvas id="salesChart" style="max-height: 300px;"></canvas>
+    </div>
+</div>
+
+<div class="card">
+    <h3>🏪 Store Overview</h3>
+    <table>
+        <thead>
+            <tr>
+                <th>Store Name</th>
+                <th>Location</th>
+                <th>Manager</th>
+                <th>Contact</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for store in stores %}
+            <tr>
+                <td><strong>{{ store.name }}</strong></td>
+                <td>{{ store.location }}</td>
+                <td>{{ store.manager_name }}</td>
+                <td>{{ store.contact_email }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<div class="card">
+    <h3>📦 Recent Products</h3>
+    <table>
+        <thead>
+            <tr>
+                <th>Product Name</th>
+                <th>SKU</th>
+                <th>Category</th>
+                <th>Price</th>
+                <th>Supplier</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for product in products|slice:":10" %}
+            <tr>
+                <td><strong>{{ product.name }}</strong></td>
+                <td>{{ product.sku }}</td>
+                <td>{{ product.category.name }}</td>
+                <td>${{ product.selling_price }}</td>
+                <td>{{ product.supplier }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% else %}
+<div class="card">
+    <h3>Please Login</h3>
+    <p>You need to be logged in to access the dashboard.</p>
+    <a href="/login/" class="btn">Login</a>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Initialize charts when page loads
+document.addEventListener('DOMContentLoaded', function() {
+    // Category Distribution Pie Chart
+    const categoryCtx = document.getElementById('categoryChart').getContext('2d');
+    const categoryData = {{ category_data|safe }};
+
+    if (categoryData && categoryData.length > 0) {
+        new Chart(categoryCtx, {
+            type: 'pie',
+            data: {
+                labels: categoryData.map(item => item.category__name),
+                datasets: [{
+                    data: categoryData.map(item => item.count),
+                    backgroundColor: [
+                        '#667eea',
+                        '#764ba2',
+                        '#f093fb',
+                        '#f5576c',
+                        '#4facfe'
+                    ],
+                    borderWidth: 2,
+                    borderColor: '#fff'
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    legend: {
+                        position: 'bottom',
+                        labels: {
+                            padding: 20,
+                            font: {
+                                size: 12
+                            }
+                        }
+                    },
+                    title: {
+                        display: true,
+                        text: 'Products by Category',
+                        font: {
+                            size: 16
+                        }
+                    }
+                }
+            }
+        });
+    }
+
+    // Sales Performance Column Chart
+    const salesCtx = document.getElementById('salesChart').getContext('2d');
+    const salesData = {{ sales_by_store|safe }};
+
+    if (salesData && salesData.length > 0) {
+        new Chart(salesCtx, {
+            type: 'bar',
+            data: {
+                labels: salesData.map(item => item.store__name),
+                datasets: [{
+                    label: 'Revenue ($)',
+                    data: salesData.map(item => parseFloat(item.total_amount)),
+                    backgroundColor: '#667eea',
+                    borderColor: '#667eea',
+                    borderWidth: 1
+                }, {
+                    label: 'Units Sold',
+                    data: salesData.map(item => item.total_quantity),
+                    backgroundColor: '#764ba2',
+                    borderColor: '#764ba2',
+                    borderWidth: 1,
+                    yAxisID: 'y1'
+                }]
+            },
+            options: {
+                responsive: true,
+                interaction: {
+                    mode: 'index',
+                    intersect: false,
+                },
+                scales: {
+                    y: {
+                        type: 'linear',
+                        display: true,
+                        position: 'left',
+                        title: {
+                            display: true,
+                            text: 'Revenue ($)'
+                        }
+                    },
+                    y1: {
+                        type: 'linear',
+                        display: true,
+                        position: 'right',
+                        title: {
+                            display: true,
+                            text: 'Units Sold'
+                        },
+                        grid: {
+                            drawOnChartArea: false,
+                        }
+                    }
+                },
+                plugins: {
+                    legend: {
+                        position: 'top',
+                    },
+                    title: {
+                        display: true,
+                        text: 'Sales Performance (Last 7 Days)',
+                        font: {
+                            size: 16
+                        }
+                    }
+                }
+            }
+        });
+    }
+});
+
+function sendMessage() {
+    const input = document.getElementById('chatInput');
+    const storeSelect = document.getElementById('storeSelect');
+    const chatContainer = document.getElementById('chatContainer');
+    const question = input.value.trim();
+    const storeId = storeSelect.value || null;
+
+    if (!question) return;
+
+    // Add user message
+    const userMessage = document.createElement('div');
+    userMessage.className = 'chat-message user';
+    userMessage.innerHTML = `<strong>You:</strong> ${question}`;
+    chatContainer.appendChild(userMessage);
+
+    // Clear input
+    input.value = '';
+
+    // Add loading message
+    const loadingMessage = document.createElement('div');
+    loadingMessage.className = 'chat-message ai loading';
+    loadingMessage.innerHTML = '<strong>AI Copilot:</strong> Analyzing your data...';
+    chatContainer.appendChild(loadingMessage);
+
+    // Scroll to bottom
+    chatContainer.scrollTop = chatContainer.scrollHeight;
+
+    // Send API request
+    fetch('/api/copilot/', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': getCookie('csrftoken')
+        },
+        body: JSON.stringify({
+            question: question,
+            store_id: storeId
+        }),
+        credentials: 'same-origin'
+    })
+    .then(response => response.json())
+    .then(data => {
+        // Remove loading message
+        chatContainer.removeChild(loadingMessage);
+
+        // Add AI response
+        const aiMessage = document.createElement('div');
+        aiMessage.className = 'chat-message ai';
+
+        if (data.success) {
+            aiMessage.innerHTML = `
+                <strong>AI Copilot:</strong>
+                <div style="margin-top: 10px; white-space: pre-wrap;">${data.answer}</div>
+                <div style="margin-top: 10px; font-size: 0.9em; color: #666;">
+                    <em>Data used: ${data.data_used.stores_count} stores, ${data.data_used.products_count} products, ${data.data_used.stocks_count} stock entries, ${data.data_used.sales_count} sales transactions</em>
+                </div>
+            `;
+        } else {
+            aiMessage.innerHTML = `<strong>AI Copilot:</strong> ${data.error || data.answer}`;
+        }
+
+        chatContainer.appendChild(aiMessage);
+        chatContainer.scrollTop = chatContainer.scrollHeight;
+    })
+    .catch(error => {
+        // Remove loading message
+        chatContainer.removeChild(loadingMessage);
+
+        // Add error message
+        const errorMessage = document.createElement('div');
+        errorMessage.className = 'chat-message ai';
+        errorMessage.innerHTML = `<strong>AI Copilot:</strong> Error: ${error.message}`;
+        chatContainer.appendChild(errorMessage);
+        chatContainer.scrollTop = chatContainer.scrollHeight;
+    });
+}
+
+function askQuestion(question) {
+    document.getElementById('chatInput').value = question;
+    sendMessage();
+}
+
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+</script>
+{% endblock %}
